@@ -1,5 +1,7 @@
 import streamlit as st
 import math
+import pandas as pd
+import altair as alt
 from scipy.stats import norm, beta
 
 # =================================================
@@ -11,7 +13,7 @@ st.set_page_config(
 )
 
 # =================================================
-# Apple-style Minimal Theme (Reddish-Orange)
+# Apple-style Minimal Theme
 # =================================================
 st.markdown("""
 <style>
@@ -28,14 +30,23 @@ div[data-testid="metric-container"] {
     border-radius: 14px;
     padding: 14px;
 }
+.badge {
+    padding: 12px 18px;
+    border-radius: 999px;
+    font-weight: 600;
+    display: inline-block;
+}
+.ship { background-color: #e6f4ea; color: #137333; }
+.iterate { background-color: #fff7e6; color: #b06000; }
+.stop { background-color: #fdecea; color: #b3261e; }
 </style>
 """, unsafe_allow_html=True)
 
 # =================================================
-# Branding Header
+# Header
 # =================================================
 st.title("YourAnalyst A/B Testing Toolkit")
-st.caption("Clear experimentation insights for confident product decisions")
+st.caption("From statistical results to confident product decisions")
 
 st.divider()
 
@@ -53,11 +64,6 @@ tab1, tab2, tab3 = st.tabs([
 # =================================================
 with tab1:
     st.subheader("Frequentist A/B Test")
-
-    st.write(
-        "Use this test to determine whether the observed difference between "
-        "two variants is **real or likely caused by random chance**."
-    )
 
     test_type = st.radio(
         "Hypothesis type",
@@ -90,76 +96,115 @@ with tab1:
         else:
             p_value = 1 - norm.cdf(z)
 
-        lift = (cr_b - cr_a) / cr_a * 100
-        ci_low = (cr_b - cr_a) - 1.96 * se
-        ci_high = (cr_b - cr_a) + 1.96 * se
+        lift = (cr_b - cr_a)
+        lift_pct = lift / cr_a * 100
+
+        ci_low = lift - 1.96 * se
+        ci_high = lift + 1.96 * se
 
         st.divider()
-        st.subheader("Results")
+        st.subheader("Key Metrics")
 
         m1, m2, m3 = st.columns(3)
-        m1.metric("Conversion Rate A", f"{cr_a*100:.2f}%")
-        m2.metric("Conversion Rate B", f"{cr_b*100:.2f}%")
-        m3.metric("Lift", f"{lift:.2f}%")
+        m1.metric("CR A", f"{cr_a*100:.2f}%")
+        m2.metric("CR B", f"{cr_b*100:.2f}%")
+        m3.metric("Lift", f"{lift_pct:.2f}%")
 
         st.write(f"**P-value:** {p_value:.4f}")
         st.write(
-            f"**95% Confidence Interval (B − A):** "
+            f"**95% Confidence Interval (Lift):** "
             f"[{ci_low*100:.2f}%, {ci_high*100:.2f}%]"
         )
 
-        # -------- Plain English --------
+        # =================================================
+        # DECISION BADGE
+        # =================================================
+        st.subheader("Decision Recommendation")
+
+        if ci_low > 0 and p_value < 0.05:
+            st.markdown(
+                '<span class="badge ship">SHIP</span>',
+                unsafe_allow_html=True
+            )
+            decision_text = (
+                "Strong evidence of improvement. "
+                "The lift is statistically significant and consistently positive."
+            )
+        elif ci_high > 0:
+            st.markdown(
+                '<span class="badge iterate">ITERATE</span>',
+                unsafe_allow_html=True
+            )
+            decision_text = (
+                "Promising direction, but not conclusive. "
+                "Consider running longer or refining the variant."
+            )
+        else:
+            st.markdown(
+                '<span class="badge stop">STOP</span>',
+                unsafe_allow_html=True
+            )
+            decision_text = (
+                "No evidence of improvement. "
+                "Variant B does not outperform the control."
+            )
+
+        st.write(decision_text)
+
+        # =================================================
+        # VISUAL CONFIDENCE INTERVAL CHART
+        # =================================================
+        st.subheader("Visual Confidence Interval")
+
+        df_ci = pd.DataFrame({
+            "metric": ["Lift"],
+            "low": [ci_low * 100],
+            "high": [ci_high * 100],
+            "mean": [lift_pct]
+        })
+
+        base = alt.Chart(df_ci).encode(
+            y=alt.Y("metric:N", title="")
+        )
+
+        ci_bar = base.mark_rule(strokeWidth=6).encode(
+            x=alt.X("low:Q", title="Lift (%)"),
+            x2="high:Q"
+        )
+
+        point = base.mark_point(
+            filled=True, size=120, color="#ff5a36"
+        ).encode(
+            x="mean:Q"
+        )
+
+        zero_line = alt.Chart(
+            pd.DataFrame({"x": [0]})
+        ).mark_rule(
+            strokeDash=[4, 4], color="gray"
+        ).encode(
+            x="x:Q"
+        )
+
+        st.altair_chart(
+            ci_bar + point + zero_line,
+            use_container_width=True
+        )
+
+        # =================================================
+        # EXPLANATIONS
+        # =================================================
         with st.expander("What does this mean?"):
-            if p_value < 0.05:
-                st.write(
-                    "The improvement seen in Variant B is unlikely to be due to "
-                    "random chance. You can be reasonably confident that Variant B "
-                    "is performing better than Variant A."
-                )
-            else:
-                st.write(
-                    "The observed difference may be due to randomness. "
-                    "There is not enough evidence yet to confidently choose Variant B."
-                )
+            st.write(
+                "The chart shows the range of plausible values for the true lift. "
+                "If the entire bar lies to the right of zero, the improvement is "
+                "statistically reliable."
+            )
 
-        # -------- Mathematical Explanation --------
         with st.expander("How is this calculated? (Math & Logic)"):
-
-            st.write("**Step 1: Conversion Rates**")
             st.latex(r"CR_A = \frac{Conversions_A}{Visitors_A}")
             st.latex(r"CR_B = \frac{Conversions_B}{Visitors_B}")
-
-            st.write("**Step 2: Pooled Conversion Rate**")
-            st.latex(r"""
-            p = \frac{Conversions_A + Conversions_B}
-                     {Visitors_A + Visitors_B}
-            """)
-
-            st.write("**Step 3: Standard Error**")
-            st.latex(r"""
-            SE = \sqrt{
-                p(1 - p)
-                \left(
-                    \frac{1}{Visitors_A}
-                    +
-                    \frac{1}{Visitors_B}
-                \right)
-            }
-            """)
-
-            st.write("**Step 4: Z-score**")
             st.latex(r"Z = \frac{CR_B - CR_A}{SE}")
-
-            st.write("**Step 5: P-value**")
-            st.latex(r"""
-            p\text{-value} =
-            \begin{cases}
-            2(1 - \Phi(|Z|)) & \text{Two-tailed} \\
-            1 - \Phi(Z) & \text{One-tailed}
-            \end{cases}
-            """)
-
-            st.write("**Step 6: Confidence Interval**")
             st.latex(r"(CR_B - CR_A) \pm 1.96 \times SE")
 
 # =================================================
@@ -167,11 +212,6 @@ with tab1:
 # =================================================
 with tab2:
     st.subheader("Bayesian A/B Test")
-
-    st.write(
-        "This method estimates the **probability that Variant B is better "
-        "than Variant A**, which is often easier to interpret."
-    )
 
     col1, col2 = st.columns(2)
 
@@ -193,32 +233,19 @@ with tab2:
 
         prob_b_better = (samples_b > samples_a).mean()
 
-        st.divider()
         st.metric("Probability B > A", f"{prob_b_better*100:.2f}%")
 
         with st.expander("What does this mean?"):
             st.write(
-                "This represents how confident you can be that Variant B "
-                "outperforms Variant A. For example, 96% means B is better "
-                "in 96 out of 100 plausible scenarios."
+                "This is the probability that Variant B truly performs better "
+                "than Variant A, given the observed data."
             )
 
-        with st.expander("How is this calculated? (Math & Logic)"):
-            st.latex(r"\theta \sim \text{Beta}(\alpha, \beta)")
-            st.latex(r"\alpha = Conversions + 1")
-            st.latex(r"\beta = Visitors - Conversions + 1")
-            st.latex(r"P(\theta_B > \theta_A)")
-
 # =================================================
-# TAB 3 — SAMPLE SIZE CALCULATOR
+# TAB 3 — SAMPLE SIZE
 # =================================================
 with tab3:
     st.subheader("Sample Size Calculator")
-
-    st.write(
-        "Estimate how many users you need **before running an experiment** "
-        "to reliably detect a meaningful improvement."
-    )
 
     baseline = st.number_input(
         "Baseline conversion rate (%)", value=5.0
@@ -249,26 +276,9 @@ with tab3:
 
         st.metric("Users per variant", f"{math.ceil(n):,}")
 
-        with st.expander("What does this mean?"):
-            st.write(
-                "Running an experiment with fewer users than this "
-                "makes it likely that you miss real improvements or "
-                "draw incorrect conclusions."
-            )
-
-        with st.expander("How is this calculated? (Math & Logic)"):
-            st.latex(r"""
-            n =
-            \frac{
-                2 \cdot p(1 - p) \cdot (Z_{\alpha} + Z_{\beta})^2
-            }{
-                (p_2 - p_1)^2
-            }
-            """)
-            st.latex(r"p = \frac{p_1 + p_2}{2}")
-
 # =================================================
 # Footer
 # =================================================
 st.divider()
-st.caption("YourAnalyst • Practical analytics, explained clearly")
+st.caption("YourAnalyst • Turning data into decisions")
+st.caption("Developed by Chandra Sekhar • © 2025")
