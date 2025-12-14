@@ -2,6 +2,7 @@
 # A/B Test Calculator
 
 A free A/B testing calculator built using Python and Streamlit.
+URL : https://ab-test-youranalyst.streamlit.app/ 
 
 ## Features
 - A/B test statistical significance (two-proportion Z-test)
