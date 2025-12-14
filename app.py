@@ -2,17 +2,17 @@ import streamlit as st
 import math
 from scipy.stats import norm, beta
 
-# -------------------------------------------------
+# =================================================
 # Page Configuration
-# -------------------------------------------------
+# =================================================
 st.set_page_config(
     page_title="YourAnalyst • A/B Testing Toolkit",
     layout="centered"
 )
 
-# -------------------------------------------------
-# Apple-style Minimal Theme
-# -------------------------------------------------
+# =================================================
+# Apple-style Minimal Theme (Reddish-Orange)
+# =================================================
 st.markdown("""
 <style>
 :root {
@@ -31,17 +31,17 @@ div[data-testid="metric-container"] {
 </style>
 """, unsafe_allow_html=True)
 
-# -------------------------------------------------
-# Header
-# -------------------------------------------------
+# =================================================
+# Branding Header
+# =================================================
 st.title("YourAnalyst A/B Testing Toolkit")
-st.caption("Clear experimentation insights for product teams")
+st.caption("Clear experimentation insights for confident product decisions")
 
 st.divider()
 
-# -------------------------------------------------
+# =================================================
 # Tabs
-# -------------------------------------------------
+# =================================================
 tab1, tab2, tab3 = st.tabs([
     "Frequentist A/B Test",
     "Bayesian A/B Test",
@@ -55,8 +55,8 @@ with tab1:
     st.subheader("Frequentist A/B Test")
 
     st.write(
-        "This test helps you determine whether the observed difference between "
-        "two variants is **likely real or just random chance**."
+        "Use this test to determine whether the observed difference between "
+        "two variants is **real or likely caused by random chance**."
     )
 
     test_type = st.radio(
@@ -83,7 +83,6 @@ with tab1:
 
         pooled = (conversions_a + conversions_b) / (visitors_a + visitors_b)
         se = math.sqrt(pooled * (1 - pooled) * (1/visitors_a + 1/visitors_b))
-
         z = (cr_b - cr_a) / se
 
         if test_type == "Two-tailed":
@@ -92,7 +91,6 @@ with tab1:
             p_value = 1 - norm.cdf(z)
 
         lift = (cr_b - cr_a) / cr_a * 100
-
         ci_low = (cr_b - cr_a) - 1.96 * se
         ci_high = (cr_b - cr_a) + 1.96 * se
 
@@ -110,83 +108,59 @@ with tab1:
             f"[{ci_low*100:.2f}%, {ci_high*100:.2f}%]"
         )
 
-        # -------------------------------
-        # Plain English Explanation
-        # -------------------------------
+        # -------- Plain English --------
         with st.expander("What does this mean?"):
             if p_value < 0.05:
                 st.write(
-                    "The difference between Variant A and Variant B is unlikely "
-                    "to be caused by random chance. This means Variant B is "
-                    "very likely performing better than Variant A."
+                    "The improvement seen in Variant B is unlikely to be due to "
+                    "random chance. You can be reasonably confident that Variant B "
+                    "is performing better than Variant A."
                 )
             else:
                 st.write(
-                    "The observed difference could be due to randomness. "
-                    "You do not yet have enough evidence to confidently say "
-                    "that Variant B is better."
+                    "The observed difference may be due to randomness. "
+                    "There is not enough evidence yet to confidently choose Variant B."
                 )
 
-        # -------------------------------
-        # Mathematical Explanation
-        # -------------------------------
+        # -------- Mathematical Explanation --------
         with st.expander("How is this calculated? (Math & Logic)"):
-            st.markdown("""
-**Step 1: Conversion Rates**
 
-\\[
-CR_A = \\frac{Conversions_A}{Visitors_A}
-\\]
+            st.write("**Step 1: Conversion Rates**")
+            st.latex(r"CR_A = \frac{Conversions_A}{Visitors_A}")
+            st.latex(r"CR_B = \frac{Conversions_B}{Visitors_B}")
 
-\\[
-CR_B = \\frac{Conversions_B}{Visitors_B}
-\\]
-
----
-
-**Step 2: Pooled Conversion Rate**
-
-Used to estimate variance assuming no true difference:
-
-\\[
-p = \\frac{Conversions_A + Conversions_B}{Visitors_A + Visitors_B}
-\\]
-
----
-
-**Step 3: Standard Error**
-
-\\[
-SE = \\sqrt{p(1-p) \\left(\\frac{1}{Visitors_A} + \\frac{1}{Visitors_B}\\right)}
-\\]
-
----
-
-**Step 4: Z-score**
-
-\\[
-Z = \\frac{CR_B - CR_A}{SE}
-\\]
-
----
-
-**Step 5: P-value**
-
-- Two-tailed test checks for **any difference**
-- One-tailed test checks for **improvement only**
-
-The p-value measures how likely this difference is if there were no real effect.
-
----
-
-**Step 6: Confidence Interval**
-
-\\[
-(CR_B - CR_A) \\pm 1.96 \\times SE
-\\]
-
-If the interval does not include 0, the result is statistically significant.
+            st.write("**Step 2: Pooled Conversion Rate**")
+            st.latex(r"""
+            p = \frac{Conversions_A + Conversions_B}
+                     {Visitors_A + Visitors_B}
             """)
+
+            st.write("**Step 3: Standard Error**")
+            st.latex(r"""
+            SE = \sqrt{
+                p(1 - p)
+                \left(
+                    \frac{1}{Visitors_A}
+                    +
+                    \frac{1}{Visitors_B}
+                \right)
+            }
+            """)
+
+            st.write("**Step 4: Z-score**")
+            st.latex(r"Z = \frac{CR_B - CR_A}{SE}")
+
+            st.write("**Step 5: P-value**")
+            st.latex(r"""
+            p\text{-value} =
+            \begin{cases}
+            2(1 - \Phi(|Z|)) & \text{Two-tailed} \\
+            1 - \Phi(Z) & \text{One-tailed}
+            \end{cases}
+            """)
+
+            st.write("**Step 6: Confidence Interval**")
+            st.latex(r"(CR_B - CR_A) \pm 1.96 \times SE")
 
 # =================================================
 # TAB 2 — BAYESIAN A/B TEST
@@ -195,8 +169,8 @@ with tab2:
     st.subheader("Bayesian A/B Test")
 
     st.write(
-        "This approach estimates the **probability that Variant B is better "
-        "than Variant A**, which is often more intuitive."
+        "This method estimates the **probability that Variant B is better "
+        "than Variant A**, which is often easier to interpret."
     )
 
     col1, col2 = st.columns(2)
@@ -224,39 +198,26 @@ with tab2:
 
         with st.expander("What does this mean?"):
             st.write(
-                "This tells you how confident you can be that Variant B "
-                "outperforms Variant A. For example, 97% means B is better "
-                "in 97 out of 100 plausible scenarios."
+                "This represents how confident you can be that Variant B "
+                "outperforms Variant A. For example, 96% means B is better "
+                "in 96 out of 100 plausible scenarios."
             )
 
         with st.expander("How is this calculated? (Math & Logic)"):
-            st.markdown("""
-Each variant's conversion rate is modeled as a **Beta distribution**.
-
-**Posterior Distribution:**
-
-\\[
-Beta(Conversions + 1, Visitors - Conversions + 1)
-\\]
-
-We then:
-1. Draw many random samples from both distributions
-2. Count how often B > A
-3. Convert this into a probability
-
-This directly answers the question:
-**“How likely is B better than A?”**
-            """)
+            st.latex(r"\theta \sim \text{Beta}(\alpha, \beta)")
+            st.latex(r"\alpha = Conversions + 1")
+            st.latex(r"\beta = Visitors - Conversions + 1")
+            st.latex(r"P(\theta_B > \theta_A)")
 
 # =================================================
-# TAB 3 — SAMPLE SIZE
+# TAB 3 — SAMPLE SIZE CALCULATOR
 # =================================================
 with tab3:
     st.subheader("Sample Size Calculator")
 
     st.write(
         "Estimate how many users you need **before running an experiment** "
-        "to detect a meaningful improvement."
+        "to reliably detect a meaningful improvement."
     )
 
     baseline = st.number_input(
@@ -279,7 +240,6 @@ with tab3:
 
         p1 = baseline
         p2 = baseline * (1 + mde)
-
         pooled = (p1 + p2) / 2
 
         n = (
@@ -291,29 +251,24 @@ with tab3:
 
         with st.expander("What does this mean?"):
             st.write(
-                "If you run the experiment with fewer users than this, "
-                "you risk missing real improvements or drawing incorrect conclusions."
+                "Running an experiment with fewer users than this "
+                "makes it likely that you miss real improvements or "
+                "draw incorrect conclusions."
             )
 
         with st.expander("How is this calculated? (Math & Logic)"):
-            st.markdown("""
-The formula balances:
-- Expected improvement (MDE)
-- Natural randomness in conversions
-- Desired confidence and power
-
-\\[
-n = \\frac{2p(1-p)(Z_{\\alpha} + Z_{\\beta})^2}{(p_2 - p_1)^2}
-\\]
-
-Where:
-- \\(Z_{\\alpha}\\): confidence
-- \\(Z_{\\beta}\\): statistical power
-- \\(p_1, p_2\\): baseline and improved rates
+            st.latex(r"""
+            n =
+            \frac{
+                2 \cdot p(1 - p) \cdot (Z_{\alpha} + Z_{\beta})^2
+            }{
+                (p_2 - p_1)^2
+            }
             """)
+            st.latex(r"p = \frac{p_1 + p_2}{2}")
 
-# -------------------------------------------------
+# =================================================
 # Footer
-# -------------------------------------------------
+# =================================================
 st.divider()
-st.caption("YourAnalyst • Practical analytics for confident decisions")
+st.caption("YourAnalyst • Practical analytics, explained clearly")
